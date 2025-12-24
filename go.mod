@@ -74,3 +74,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gotest.tools v2.2.0+incompatible // indirect
 )
+
+replace (
+	github.com/tyler-smith/go-bip39 => github.com/alexvec/go-bip39 v1.1.0
+)
