@@ -32,6 +32,16 @@ var hasherPool = sync.Pool{
 	New: func() interface{} { return crypto.NewKeccakState() },
 }
 
+// prefixSlices holds pre-allocated byte slices for each possible prefix value.
+// This avoids heap allocation when writing the prefix byte to the hasher.
+var prefixSlices [256][]byte
+
+func init() {
+	for i := range prefixSlices {
+		prefixSlices[i] = []byte{byte(i)}
+	}
+}
+
 // encodeBufferPool holds temporary encoder buffers for DeriveSha and TX encoding.
 var encodeBufferPool = sync.Pool{
 	New: func() interface{} { return new(bytes.Buffer) },
@@ -69,8 +79,7 @@ func prefixedRlpHash(prefix byte, x interface{}) (h common.Hash) {
 	sha := hasherPool.Get().(crypto.KeccakState)
 	defer hasherPool.Put(sha)
 	sha.Reset()
-	prefixBytes := [1]byte{prefix}
-	sha.Write(prefixBytes[:])
+	sha.Write(prefixSlices[prefix]) // use pre-allocated slice to avoid heap allocation
 	rlp.Encode(sha, x)
 	sha.Read(h[:])
 	return h
