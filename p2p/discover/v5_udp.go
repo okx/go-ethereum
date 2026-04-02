@@ -843,6 +843,7 @@ func (t *UDPv5) handlePing(p *v5wire.Ping, fromID enode.ID, fromAddr netip.AddrP
 
 // handleFindnode returns nodes to the requester.
 func (t *UDPv5) handleFindnode(p *v5wire.Findnode, fromID enode.ID, fromAddr netip.AddrPort) {
+	t.log.Trace("handleFindnode", "from", fromAddr, "distances", p.Distances)
 	nodes := t.collectTableNodes(fromAddr.Addr(), p.Distances, findnodeResultLimit)
 	for _, resp := range packNodes(p.ReqID, nodes) {
 		t.sendResponse(fromID, fromAddr, resp)
@@ -863,10 +864,13 @@ func (t *UDPv5) collectTableNodes(rip netip.Addr, distances []uint, limit int) [
 		processed[dist] = struct{}{}
 
 		checkLive := !t.tab.cfg.NoFindnodeLivenessCheck
-		for _, n := range t.tab.appendBucketNodes(dist, bn[:0], checkLive) {
+		bucketNodes := t.tab.appendBucketNodes(dist, bn[:0], checkLive)
+		t.log.Trace("collectTableNodes", "dist", dist, "rip", rip, "bucketNodes", len(bucketNodes))
+		for _, n := range bucketNodes {
 			// Apply some pre-checks to avoid sending invalid nodes.
 			// Note liveness is checked by appendLiveNodes.
-			if netutil.CheckRelayAddr(rip, n.IPAddr()) != nil {
+			if err := netutil.CheckRelayAddr(rip, n.IPAddr()); err != nil {
+				t.log.Trace("CheckRelayAddr filtered node", "nodeIP", n.IPAddr(), "rip", rip, "err", err)
 				continue
 			}
 			nodes = append(nodes, n)
